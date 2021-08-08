@@ -9,7 +9,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { PolyjuiceHttpProvider } from '@polyjuice-provider/web3';
 import { AddressTranslator } from 'nervos-godwoken-integration';
 
-import { SimpleStorageWrapper } from '../lib/contracts/SimpleStorageWrapper';
+import { OrangeTokenWrapper } from '../lib/contracts/OrangeTokenWrapper';
 import { CONFIG } from '../config';
 
 async function createWeb3() {
@@ -41,19 +41,22 @@ async function createWeb3() {
 
 export function App() {
     const [web3, setWeb3] = useState<Web3>(null);
-    const [contract, setContract] = useState<SimpleStorageWrapper>();
+    const [contract, setContract] = useState<OrangeTokenWrapper>();
     const [accounts, setAccounts] = useState<string[]>();
     const [l2Balance, setL2Balance] = useState<bigint>();
     const [existingContractIdInputValue, setExistingContractIdInputValue] = useState<string>();
-    const [storedValue, setStoredValue] = useState<number | undefined>();
+    const [tokenTotalSupply, setTokenTotalSupply] = useState<string | undefined>();
+    const [userTokenBalance, setUserTokenBalance] = useState<string | undefined>();
+    const [Balance, setBalance] = useState<string | undefined>();
+    const [BalanceOfAddress, setBalanceOfAddress] = useState<string | undefined>();
+    const [transferToAddress, setTransferToAddress] = useState<string | undefined>();
+    const [tansferValue, setTansferValue] = useState<string | undefined>();
+    const [transferTx, setTransferTx] = useState<string | undefined>();
+    const [approveTx, setApproveTx] = useState<string | undefined>();
     const [deployTxHash, setDeployTxHash] = useState<string | undefined>();
     const [polyjuiceAddress, setPolyjuiceAddress] = useState<string | undefined>();
     const [transactionInProgress, setTransactionInProgress] = useState(false);
     const toastId = React.useRef(null);
-    const [newStoredNumberInputValue, setNewStoredNumberInputValue] = useState<
-        number | undefined
-    >();
-
     useEffect(() => {
         if (accounts?.[0]) {
             const addressTranslator = new AddressTranslator();
@@ -87,7 +90,7 @@ export function App() {
     const account = accounts?.[0];
 
     async function deployContract() {
-        const _contract = new SimpleStorageWrapper(web3);
+        const _contract = new OrangeTokenWrapper(web3);
 
         try {
             setDeployTxHash(undefined);
@@ -98,7 +101,7 @@ export function App() {
             setDeployTxHash(transactionHash);
             setExistingContractAddress(_contract.address);
             toast(
-                'Successfully deployed a smart-contract. You can now proceed to get or set the value in a smart contract.',
+                'Successfully deployed a smart-contract. You can now proceed to transfer token in a smart contract.',
                 { type: 'success' }
             );
         } catch (error) {
@@ -111,29 +114,43 @@ export function App() {
         }
     }
 
-    async function getStoredValue() {
-        const value = await contract.getStoredValue(account);
-        toast('Successfully read latest stored value.', { type: 'success' });
+    async function getTotalSupply() {
+        const value = await contract.getTotalSupply();
+        toast('Successfully get total supply.', { type: 'success' });
 
-        setStoredValue(value);
+        setTokenTotalSupply(value);
+    }
+
+    async function getBlanceOfAddress() {
+        const value = await contract.getBalanceOfAddress(BalanceOfAddress);
+        toast('Successfully get address balance.', { type: 'success' });
+
+        setBalance(value);
     }
 
     async function setExistingContractAddress(contractAddress: string) {
-        const _contract = new SimpleStorageWrapper(web3);
+        const _contract = new OrangeTokenWrapper(web3);
         _contract.useDeployed(contractAddress.trim());
 
         setContract(_contract);
-        setStoredValue(undefined);
+        setTokenTotalSupply(undefined);
+        const value = await _contract.getBalanceOfAddress(polyjuiceAddress);
+        setUserTokenBalance(value)
+
     }
 
-    async function setNewStoredValue() {
+    async function transfer() {
         try {
             setTransactionInProgress(true);
-            await contract.setStoredValue(newStoredNumberInputValue, account);
+            const transactionHash = await contract.transfer(transferToAddress, tansferValue , account);
             toast(
-                'Successfully set latest stored value. You can refresh the read value now manually.',
+                'Successfully Transfered',
                 { type: 'success' }
             );
+            // console.log(transactionHash,"transactionHash");
+            setTransferTx(transactionHash.transactionHash)
+            const value = await contract.getBalanceOfAddress(polyjuiceAddress);
+            setUserTokenBalance(value)
         } catch (error) {
             console.error(error);
             toast.error(
@@ -183,11 +200,8 @@ export function App() {
             <br />
             <hr />
             <p>
-                The button below will deploy a SimpleStorage smart contract where you can store a
-                number value. By default the initial stored value is equal to 123 (you can change
-                that in the Solidity smart contract). After the contract is deployed you can either
-                read stored value from smart contract or set a new one. You can do that using the
-                interface below.
+                The button below will deploy a Token smart contract where you can tranfer a
+                number token. 
             </p>
             <button onClick={deployContract} disabled={!l2Balance}>
                 Deploy contract
@@ -205,19 +219,40 @@ export function App() {
             </button>
             <br />
             <br />
-            <button onClick={getStoredValue} disabled={!contract}>
-                Get stored value
+            {userTokenBalance ? <>&nbsp;&nbsp;Your Token Balance: {userTokenBalance.toString()}</> : null}
+            <br />
+            <br />
+            <button onClick={getTotalSupply} disabled={!contract}>
+                Get Total Supply
             </button>
-            {storedValue ? <>&nbsp;&nbsp;Stored value: {storedValue.toString()}</> : null}
+            {tokenTotalSupply ? <>&nbsp;&nbsp;Orange Token Total Supply: {tokenTotalSupply.toString()}</> : null}
             <br />
             <br />
             <input
-                type="number"
-                onChange={e => setNewStoredNumberInputValue(parseInt(e.target.value, 10))}
+                type="string"
+                defaultValue="address"
+                onChange={e => setBalanceOfAddress(e.target.value)}
             />
-            <button onClick={setNewStoredValue} disabled={!contract}>
-                Set new stored value
+            <button onClick={getBlanceOfAddress} disabled={!contract}>
+                Get Balance
             </button>
+            {Balance ? <>&nbsp;&nbsp;Orange Token Balance: {Balance.toString()}</> : null}
+            <br />
+            <br />
+            <input
+                type="string"
+                defaultValue="address"
+                onChange={e => setTransferToAddress(e.target.value)}
+            />
+            <input
+                type="string"
+                defaultValue="value"
+                onChange={e => setTansferValue(e.target.value)}
+            />
+            <button onClick={transfer} disabled={!contract}>
+                Transfer
+            </button>
+            {transferTx ? <>&nbsp;&nbsp;Success : {transferTx}</> : null}
             <br />
             <br />
             <br />
